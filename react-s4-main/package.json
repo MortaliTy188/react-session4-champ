@@ -10,13 +10,17 @@
     "@mui/material": "^6.4.2",
     "@mui/x-date-pickers": "^7.25.0",
     "axios": "^1.7.9",
+    "buffer": "^6.0.3",
     "cra-template": "1.2.0",
     "date-fns": "^2.29.3",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-scripts": "5.0.1",
-    "styled-components": "^6.1.14"
+    "stream-browserify": "^3.0.0",
+    "styled-components": "^6.1.14",
+    "timers-browserify": "^2.0.12",
+    "xml2js": "^0.6.2"
   },
   "scripts": {
     "start": "react-scripts start",

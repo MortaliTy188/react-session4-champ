@@ -18,14 +18,21 @@ const Content = ({ searchQuery }) => {
   const [date, setDate] = React.useState(new Date());
   const [events, setEvents] = useState([]);
   const [news, setNews] = useState([]);
-  const [count, setCount] = useState(5); 
+  const [count, setCount] = useState(5);
 
   const fetchNews = async () => {
     try {
-      const response = await axios.get(
-        `http://localhost:3000/news?count=${count}`
-      );
-      setNews(response.data);
+      const response = await axios.get("http://127.0.0.1:4444/news");
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(response.data, "text/xml");
+      const items = xmlDoc.getElementsByTagName("item");
+      const newsItems = Array.from(items).map((item) => ({
+        title: item.getElementsByTagName("title")[0].textContent,
+        date: item.getElementsByTagName("date")[0].textContent,
+        description: item.getElementsByTagName("description")[0].textContent,
+        image: item.getElementsByTagName("image")[0].textContent,
+      }));
+      setNews(newsItems);
     } catch (error) {
       console.error("Error fetching news:", error);
     }
@@ -33,7 +40,7 @@ const Content = ({ searchQuery }) => {
 
   const fetchEvents = async () => {
     try {
-      const response = await axios.get("http://localhost:3000/api/v1/events/");
+      const response = await axios.get("http://127.0.0.1:4444/events");
       setEvents(response.data);
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -44,15 +51,23 @@ const Content = ({ searchQuery }) => {
     fetchNews();
     fetchEvents();
     const interval = setInterval(() => {
-      setCount((prevCount) => prevCount + 5); 
+      setCount((prevCount) => prevCount + 5);
       fetchNews();
-    }, 15000); 
+    }, 15000);
     return () => clearInterval(interval);
   }, [count]);
 
+  const isValidDate = (date) => {
+    return !isNaN(Date.parse(date));
+  };
+
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return format(date, "dd.MM.yyyy");
+    if (isValidDate(dateString)) {
+      const date = new Date(dateString);
+      return format(date, "dd.MM.yyyy");
+    } else {
+      return "Invalid date";
+    }
   };
 
   const filterData = (data) => {
@@ -67,21 +82,21 @@ const Content = ({ searchQuery }) => {
   const generateICS = (event) => {
     const uid = Date.now();
     const dtstamp = format(new Date(), "yyyyMMdd'T'HHmmss'Z'");
-    const dtstart = format(new Date(event.event_date), "yyyyMMdd'T'HHmmss'Z'");
-    const dtend = format(new Date(event.event_date), "yyyyMMdd'T'HHmmss'Z'");
+    const dtstart = format(new Date(event.date), "yyyyMMdd'T'HHmmss'Z'");
+    const dtend = format(new Date(event.date), "yyyyMMdd'T'HHmmss'Z'");
 
     const icsContent = `
 BEGIN:VCALENDAR
 VERSION:2.0
 BEGIN:VEVENT
-SUMMARY:${event.name}
+SUMMARY:${event.title}
 DTSTART:${dtstart}
 DTEND:${dtend}
 DTSTAMP:${dtstamp}
 UID:${uid}
-DESCRIPTION:${event.short_description}
+DESCRIPTION:${event.description}
 LOCATION:
-ORGANIZER:${event.responsible_persons}
+ORGANIZER:${event.author}
 STATUS:CONFIRMED
 PRIORITY:0
 END:VEVENT
@@ -91,7 +106,7 @@ END:VCALENDAR`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${event.name}.ics`;
+    a.download = `${event.title}.ics`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -104,7 +119,6 @@ END:VCALENDAR`;
   return (
     <Container sx={{ marginTop: 3 }} maxWidth="xl">
       <Grid container spacing={3}>
-        {/* Левая часть контейнера */}
         <Grid item xs={12} md={4}>
           <Typography variant="h6" fontWeight="bold" gutterBottom>
             Календарь событий
@@ -125,15 +139,15 @@ END:VCALENDAR`;
           </Typography>
           <Grid container spacing={2}>
             {filteredEvents.length ? (
-              filteredEvents.map((event) => (
-                <Grid item xs={12} key={event.id}>
+              filteredEvents.map((event, index) => (
+                <Grid item xs={12} key={index}>
                   <Card sx={{ backgroundColor: "#88b04b" }}>
                     <CardContent sx={{ color: "white" }}>
                       <Typography variant="body1" fontWeight="bold">
-                        {event.name}
+                        {event.title}
                       </Typography>
                       <Typography variant="body2">
-                        {event.short_description}
+                        {event.description}
                       </Typography>
                       <Box display="flex" justifyContent="space-between">
                         <Box display="flex" gap="10px">
@@ -144,11 +158,11 @@ END:VCALENDAR`;
                             Календарь
                           </Button>
                           <Typography variant="caption">
-                            {formatDate(event.event_date)}
+                            {formatDate(event.date)}
                           </Typography>
                         </Box>
                         <Typography variant="caption" fontWeight="bold">
-                          {event.responsible_persons}
+                          {event.author}
                         </Typography>
                       </Box>
                     </CardContent>
@@ -161,7 +175,6 @@ END:VCALENDAR`;
           </Grid>
         </Grid>
 
-        {/* Правая часть контейнера */}
         <Grid item xs={12} md={8}>
           <Typography variant="h6" fontWeight="bold" gutterBottom>
             Новости
@@ -180,9 +193,9 @@ END:VCALENDAR`;
                     }}
                   >
                     <CardContent sx={{ flex: 1 }}>
-                      {item.enclosure?.url && (
+                      {item.image && (
                         <img
-                          src={item.enclosure.url}
+                          src={item.image}
                           alt={item.title}
                           style={{
                             height: "137px",
@@ -195,14 +208,12 @@ END:VCALENDAR`;
                         {item.title}
                       </Typography>
                       <Typography variant="body2">
-                        {item.contentSnippet}
+                        {item.description}
                       </Typography>
                       <Typography variant="body2">
-                        {new Date(item.pubDate).toLocaleDateString("ru-RU", {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })}
+                        {isValidDate(item.date)
+                          ? formatDate(item.date)
+                          : "Invalid date"}
                       </Typography>
                     </CardContent>
                   </Card>
